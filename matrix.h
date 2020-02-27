@@ -29,9 +29,12 @@ private:
     std::vector<std::vector<T> > matrix;
     unsigned rows;
     unsigned cols;
+    static int numThreads;
+    Matrix<T> multiply(const Matrix<T> &m1, const Matrix<T> &m2);
 
 public:
-
+    // Empty constructor
+    Matrix() { }
     // Constructor overloading - filename
     Matrix(const std::string &route);
     // Constructor overloading - row, column and a value to be repeated
@@ -42,12 +45,14 @@ public:
     virtual ~Matrix();
     // Assignment operators
     Matrix<T> &operator=(const Matrix<T> &_mat);
-    // Multiplication operators without assignment
-    Matrix<T> operator*(const Matrix<T> &_mat);
+    // Friend function to multiply  operators without assignment
+    friend Matrix<T> operator*(const Matrix<T> &m1, const Matrix<T> &m2) {
+        { Matrix<T> ref; return ref.multiply(m1,m2); }
+    }
     // Multiplication operators with assignment 
     Matrix<T> &operator*=(const Matrix<T> &_mat);
     // Perform transpose of matrices
-    Matrix<T> transpose();
+    Matrix<T> transpose() const;
 
     // () operator to access the value of matrix using indices
     T &operator()(const unsigned &row, const unsigned &col);
@@ -58,6 +63,10 @@ public:
     unsigned getRowSize() const;
     // Column size of the matrix
     unsigned getColSize() const;
+    // Set number of threads
+    static void setNumofThread(int _num);
+    // Get number of threads
+    static int getNumofThread();
     // Function to print the matrix
     void printMatrix();
 };

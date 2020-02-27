@@ -2,10 +2,15 @@
 #define MATRIX_CPP
 #include <iostream>
 #include <fstream>
+#include <thread>
+using namespace std;
+
 // Include the header file
 #include "matrix.h"
 
-// Constructor with row, column and a value  
+template <typename T>
+int Matrix<T>::numThreads = 0;
+// Constructor with row, column and a value 
 template <typename T>
 Matrix<T>::Matrix(unsigned _r, unsigned _c, const T &_mat)
 {
@@ -22,7 +27,6 @@ Matrix<T>::Matrix(unsigned _r, unsigned _c, const T &_mat)
 template <typename T>
 Matrix<T>::Matrix(const std::string &route)
 {
-
     std::ifstream file(route);
     if (!file)
     {
@@ -89,26 +93,49 @@ Matrix<T> &Matrix<T>::operator=(const Matrix<T> &_mat)
     return *this;
 }
 
-// Multiplication operator only
-template <typename T>
-Matrix<T> Matrix<T>::operator*(const Matrix<T> &_mat)
-{
-    unsigned rows = _mat.getRowSize();
-    unsigned cols = _mat.getColSize();
-    Matrix result(rows, cols, 0.0);
 
-    for (unsigned i = 0; i < rows; i++)
-    {
-        for (unsigned j = 0; j < cols; j++)
-        {
-            for (unsigned k = 0; k < rows; k++)
-            {
-                result(i, j) += this->matrix[i][k] * _mat(k, j);
+template <class T>
+void matrixParallel(const Matrix<T>* a, const Matrix<T>* b, int numThreads, int currentThread, Matrix<T>* c) {
+
+    for (int i = currentThread; i < a->getRowSize(); i+=numThreads) {
+        for (int j = 0; j < b->getRowSize(); j++) {
+            T result = 0;
+            for (int k = 0; k < a->getColSize(); k++) {
+                result += ((*a)(i,k)*(*b)(j,k));
             }
+            (*c)(i,j) = result;
         }
     }
 
-    return result;
+}
+
+template <typename T>
+Matrix<T> Matrix<T>::multiply(const Matrix<T> &m1, const Matrix<T> &m2) {    
+    // Parallel Method
+    Matrix<T> m2t = m2.transpose();
+    Matrix<T> multiply(m1.getRowSize(), m2.getColSize(), 0.0);
+
+    int numCPU = std::thread::hardware_concurrency();
+    std::cout << numCPU;
+    std::cout << endl;
+    std::thread* threads = new std::thread[numCPU];
+
+    const Matrix<T>* m1Pointer = &m1;
+    const Matrix<T>* m2tPointer = &m2t;
+    
+    Matrix<T>* multiplyPointer = &multiply;
+
+    for (int i = 0; i < numCPU; i++) {
+        threads[i] = thread(matrixParallel<T>, m1Pointer, m2tPointer, numCPU, i, multiplyPointer);
+    }
+
+    for (int i = 0; i < numCPU; i++) {
+        threads[i].join();
+    }
+
+    delete[] threads;
+
+    return multiply;
 }
 
 // Multiplication operator and assignment operator
@@ -122,13 +149,15 @@ Matrix<T> &Matrix<T>::operator*=(const Matrix<T> &_mat)
 
 // Transpose of a matrix
 template <typename T>
-Matrix<T> Matrix<T>::transpose()
+Matrix<T> Matrix<T>::transpose() const
 {
-    Matrix result(rows, cols, 0.0);
+    int rows = this->getRowSize();
+    int cols = this->getColSize();
+    Matrix result(cols, rows, 0.0);
 
-    for (unsigned i = 0; i < rows; i++)
+    for (unsigned i = 0; i < cols; i++)
     {
-        for (unsigned j = 0; j < cols; j++)
+        for (unsigned j = 0; j < rows; j++)
         {
             result(i, j) = this->matrix[j][i];
         }
@@ -165,6 +194,20 @@ unsigned Matrix<T>::getColSize() const
     return this->cols;
 }
 
+// Set number of threads for execution
+template <typename T>
+void Matrix<T>::setNumofThread(int _num)
+{
+    Matrix<T>::numThreads = _num;
+}
+
+// Get number of threads for execution
+template <typename T>
+int Matrix<T>::getNumofThread()
+{
+    return Matrix<T>::numThreads;
+}
+
 // Print the matrix
 template <typename T>
 void Matrix<T>::printMatrix()
@@ -177,6 +220,17 @@ void Matrix<T>::printMatrix()
         }
         std::cout << std::endl;
     }
+    std::cout << std::endl;
+}
+
+void checkDimen() {
+     // if (m1.get () != m2.getRows()) {
+    //     cout << "Error: Cannot Multiply Matrices of Dimensions ";
+    //     cout << "(" << m1.getRows() << "x" << m1.getCols() << ")*";
+    //     cout << "(" << m2.getRows() << "x" << m2.getCols() << ")" << endl;
+    //     cout << "        (Must be in the form (MxN)*(NxP)" << endl;
+    //     return Matrix<type>();
+    // }
 }
 
 #endif

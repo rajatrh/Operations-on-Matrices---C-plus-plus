@@ -2,9 +2,6 @@
 
 int main(int argc, char **argv)
 {
-    // Matrix<double> mat1(10, 10, 1.0);
-    // Matrix<double> mat2(10, 10, 3.0);
-
     Matrix<double> mat1("matrix1.txt");
 
     mat1.printMatrix();
