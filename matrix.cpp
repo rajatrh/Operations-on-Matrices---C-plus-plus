@@ -8,9 +8,39 @@ using namespace std;
 // Include the header file
 #include "matrix.h"
 
+/*
+ * A bare minimum logger
+ * input : string pointer (to the log)
+ * usage : Logger<T>("Test")
+ */
 template <typename T>
-int Matrix<T>::numThreads = 0;
-// Constructor with row, column and a value 
+void Logger(const std::string &log) {
+    if (Matrix<T>::isLoggerEnabled()) {
+        std::cout << log;   
+    }
+    std::cout << std::endl; 
+}
+
+/*
+ * Number of threads explicitly to be used
+ * default : 1
+ */
+template <typename T>
+int Matrix<T>::numThreads = 1;
+
+/*
+ * Logger is controlled using the boolean logging
+ * default : false
+ */
+template <typename T>
+bool Matrix<T>::logging = false;
+
+/*
+ * Constructor with row columns and initial value
+ * inputs : _r -> number of rows
+ *          _c -> number of columns
+ *          _mat -> Value of the type T
+ */
 template <typename T>
 Matrix<T>::Matrix(unsigned _r, unsigned _c, const T &_mat)
 {
@@ -23,7 +53,12 @@ Matrix<T>::Matrix(unsigned _r, unsigned _c, const T &_mat)
     cols = _c;
 }
 
-// Constructor with filename
+/*
+ * Constructor with row columns and initial value
+ * input : route -> file name
+ *          
+ * Could alternatively send File Pointer as well (not implemented)
+ */
 template <typename T>
 Matrix<T>::Matrix(const std::string &route)
 {
@@ -50,7 +85,9 @@ Matrix<T>::Matrix(const std::string &route)
     cols = _c;
 }
 
-// Copy constructor
+/*
+ * Copy constructor
+ */
 template <typename T>
 Matrix<T>::Matrix(const Matrix<T> &_mat)
 {
@@ -59,11 +96,17 @@ Matrix<T>::Matrix(const Matrix<T> &_mat)
     cols = _mat.getColSize();
 }
 
-// Destructor Virtual
+/*
+ * Virtual destructor
+ */
 template <typename T>
 Matrix<T>::~Matrix() {}
 
-// Assignment Operator 
+/*
+ * Assignment operator
+ * inputs : _mat -> Matrix to be assigned to a variable
+ * 
+ */
 template <typename T>
 Matrix<T> &Matrix<T>::operator=(const Matrix<T> &_mat)
 {
@@ -93,49 +136,71 @@ Matrix<T> &Matrix<T>::operator=(const Matrix<T> &_mat)
     return *this;
 }
 
-
+/*
+ * Inplace matric multiplication
+ * inputs : _res -> Address to resultant matrix
+ *          _mat1 -> 1st matrix
+ *          _mat2 -> 2nd matrix
+ *          currentThread -> current thread number
+ *          numThreads -> Number of threads allocated
+ */
 template <class T>
-void matrixParallel(const Matrix<T>* a, const Matrix<T>* b, int numThreads, int currentThread, Matrix<T>* c) {
+void parallelMultiplication(const Matrix<T>* _mat1, const Matrix<T>* _mat2, int numThreads, int currentThread, Matrix<T>* _res) {
 
-    for (int i = currentThread; i < a->getRowSize(); i+=numThreads) {
-        for (int j = 0; j < b->getRowSize(); j++) {
+    for (int i = currentThread; i < _mat1->getRowSize(); i+=numThreads) {
+        for (int j = 0; j < _mat2->getRowSize(); j++) {
             T result = 0;
-            for (int k = 0; k < a->getColSize(); k++) {
-                result += ((*a)(i,k)*(*b)(j,k));
+            for (int k = 0; k < _mat1->getColSize(); k++) {
+                result += ((*_mat1)(i,k)*(*_mat2)(j,k));
             }
-            (*c)(i,j) = result;
+            (*_res)(i,j) = result;
         }
     }
-
 }
 
+/*
+ * Set up the matrix instatiate number of threads
+ * inputs : _res -> Address to resultant matrix
+ *          _mat -> 1st matrix
+ *          _mat2 -> 2nd matrix
+ */
 template <typename T>
-Matrix<T> Matrix<T>::multiply(const Matrix<T> &m1, const Matrix<T> &m2) {    
+Matrix<T> Matrix<T>::multiply(const Matrix<T> &_mat1, const Matrix<T> &_mat2) {    
+
+    if (_mat1.getColSize() != _mat2.getRowSize()) {
+        cout << "Error: Cannot Multiply Matrices of Dimensions ";
+        cout << "(" << _mat1.getRowSize() << "x" << _mat1.getColSize() << ")*";
+        cout << "(" << _mat2.getRowSize() << "x" << _mat2.getColSize() << ")" << endl;
+        cout << "        (Must be in the form (MxN)*(NxP)" << endl;
+        return Matrix<T>(0,0,0);
+    }
     // Parallel Method
-    Matrix<T> m2t = m2.transpose();
-    Matrix<T> multiply(m1.getRowSize(), m2.getColSize(), 0.0);
+    Matrix<T> mat2t = _mat2.transpose();
+    Matrix<T> product(_mat1.getRowSize(), _mat2.getColSize(), 0.0);
 
     int numCPU = std::thread::hardware_concurrency();
-    std::cout << numCPU;
-    std::cout << endl;
+    
+    Logger<T>("Number of threads : " + std::to_string(numCPU));
     std::thread* threads = new std::thread[numCPU];
 
-    const Matrix<T>* m1Pointer = &m1;
-    const Matrix<T>* m2tPointer = &m2t;
+    const Matrix<T>* mat1Pointer = &_mat1;
+    const Matrix<T>* ma2tPointer = &mat2t;
     
-    Matrix<T>* multiplyPointer = &multiply;
+    Matrix<T>* productPointer = &product;
 
     for (int i = 0; i < numCPU; i++) {
-        threads[i] = thread(matrixParallel<T>, m1Pointer, m2tPointer, numCPU, i, multiplyPointer);
+        Logger<T>("Starting thread : " + std::to_string(i));
+        threads[i] = thread(parallelMultiplication<T>, mat1Pointer, ma2tPointer, numCPU, i, productPointer);
     }
 
     for (int i = 0; i < numCPU; i++) {
+        Logger<T>("Joining thread : " + std::to_string(i));
         threads[i].join();
     }
 
     delete[] threads;
 
-    return multiply;
+    return product;
 }
 
 // Multiplication operator and assignment operator
@@ -166,7 +231,7 @@ Matrix<T> Matrix<T>::transpose() const
     return result;
 }
 
-// Operator () overloaded
+// Operator () overloaded and used to get elements at indices i,j
 template <typename T>
 T &Matrix<T>::operator()(const unsigned &row, const unsigned &col)
 {
@@ -180,14 +245,14 @@ const T &Matrix<T>::operator()(const unsigned &row, const unsigned &col) const
     return this->matrix[row][col];
 }
 
-// Number of rows
+// Get number of rows
 template <typename T>
 unsigned Matrix<T>::getRowSize() const
 {
     return this->rows;
 }
 
-// Number of columns
+// Get number of columns
 template <typename T>
 unsigned Matrix<T>::getColSize() const
 {
@@ -208,7 +273,22 @@ int Matrix<T>::getNumofThread()
     return Matrix<T>::numThreads;
 }
 
+// Get status of Logger
+template <typename T>
+bool Matrix<T>::isLoggerEnabled()
+{
+    return Matrix<T>::logging;
+}
+
+// Set status of Logger
+template <typename T>
+void Matrix<T>::enableLogger()
+{
+    Matrix<T>::logging = true;
+}
+
 // Print the matrix
+// Can write an additional functionality to write/stream resutls to a file/memory
 template <typename T>
 void Matrix<T>::printMatrix()
 {
@@ -222,15 +302,4 @@ void Matrix<T>::printMatrix()
     }
     std::cout << std::endl;
 }
-
-void checkDimen() {
-     // if (m1.get () != m2.getRows()) {
-    //     cout << "Error: Cannot Multiply Matrices of Dimensions ";
-    //     cout << "(" << m1.getRows() << "x" << m1.getCols() << ")*";
-    //     cout << "(" << m2.getRows() << "x" << m2.getCols() << ")" << endl;
-    //     cout << "        (Must be in the form (MxN)*(NxP)" << endl;
-    //     return Matrix<type>();
-    // }
-}
-
 #endif

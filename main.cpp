@@ -2,6 +2,7 @@
 
 int main(int argc, char **argv)
 {
+    Matrix<double>::enableLogger();
     Matrix<double> mat1("matrix1.txt");
 
     mat1.printMatrix();
