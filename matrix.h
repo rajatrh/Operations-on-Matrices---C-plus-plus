@@ -33,6 +33,7 @@ private:
     // Variable to control logging
     static bool logging;
     Matrix<T> multiply(const Matrix<T> &m1, const Matrix<T> &m2);
+    bool equals(const Matrix<T> &m1, const Matrix<T> &m2);
 
 public:
     // Empty constructor
@@ -55,6 +56,11 @@ public:
     // Friend function to multiply  operators without assignment
     friend Matrix<T> operator*(const Matrix<T> &m1, const Matrix<T> &m2) {
         { Matrix<T> ref; return ref.multiply(m1,m2); }
+    }
+     
+    //check if 2 matrices are equal
+    friend bool operator==(const Matrix<T> &m1, const Matrix<T> &m2) {
+        { Matrix<T> ref; return ref.equals(m1,m2); }
     }
 
     // () operator to access the value of matrix using indices

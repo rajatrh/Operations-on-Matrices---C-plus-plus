@@ -3,6 +3,7 @@
 #include <iostream>
 #include <fstream>
 #include <thread>
+#include <typeinfo>
 using namespace std;
 
 // Include the header file
@@ -14,11 +15,10 @@ using namespace std;
  * usage : Logger<T>("Test")
  */
 template <typename T>
-void Logger(const std::string &log) {
+inline void Logger(const std::string &log) {
     if (Matrix<T>::isLoggerEnabled()) {
-        std::cout << log;   
+        std::cout << log << std::endl;   
     }
-    std::cout << std::endl; 
 }
 
 /*
@@ -26,7 +26,7 @@ void Logger(const std::string &log) {
  * default : 1
  */
 template <typename T>
-int Matrix<T>::numThreads = 1;
+int Matrix<T>::numThreads = std::thread::hardware_concurrency();;
 
 /*
  * Logger is controlled using the boolean logging
@@ -65,12 +65,17 @@ Matrix<T>::Matrix(const std::string &route)
     std::ifstream file(route);
     if (!file)
     {
-        std::cerr << "Unable to open matrix file.\n";
+        std::cerr << "Error: Unable to open matrix file.\n";
         return;
     }
-    unsigned _r = 0, _c = 0;
+    int _r = 0, _c = 0;
     file >> _r;
     file >> _c;
+
+    if (_r < 0 || _c < 0) {
+        cout << "Error: Invalid dimensions for a matrix. Please verify the input.";
+        return;
+    }
 
     matrix.resize(_r);
     for (unsigned i = 0; i < matrix.size(); i++)
@@ -159,14 +164,43 @@ void parallelMultiplication(const Matrix<T>* _mat1, const Matrix<T>* _mat2, int 
 }
 
 /*
+ * Compare matrices for equality
+ * inputs : _mat -> 1st matrix
+ *          _mat2 -> 2nd matrix
+ */
+template <typename T>
+bool Matrix<T>::equals(const Matrix<T> &_mat1, const Matrix<T> &_mat2) {
+    if (_mat1.getColSize() != _mat2.getColSize() || _mat1.getRowSize() != _mat2.getRowSize()) {
+        return false;
+    }
+    int rows = _mat1.getRowSize();
+    int cols = _mat1.getColSize();
+
+    for (unsigned i = 0; i < rows; i++)
+    {
+        for (unsigned j = 0; j < cols; j++)
+        {
+            if (_mat1(i,j) != _mat2(i,j)) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+/*
  * Set up the matrix instatiate number of threads
  * inputs : _res -> Address to resultant matrix
  *          _mat -> 1st matrix
  *          _mat2 -> 2nd matrix
  */
 template <typename T>
-Matrix<T> Matrix<T>::multiply(const Matrix<T> &_mat1, const Matrix<T> &_mat2) {    
-
+Matrix<T> Matrix<T>::multiply(const Matrix<T> &_mat1, const Matrix<T> &_mat2) {
+    const char* type = typeid(T).name();
+    if (*type != 'i' && *type != 'f' && *type != 'd') {
+        cout << "Error: Multiplication operation on invalid type of data.";
+    }
     if (_mat1.getColSize() != _mat2.getRowSize()) {
         cout << "Error: Cannot Multiply Matrices of Dimensions ";
         cout << "(" << _mat1.getRowSize() << "x" << _mat1.getColSize() << ")*";
@@ -178,7 +212,15 @@ Matrix<T> Matrix<T>::multiply(const Matrix<T> &_mat1, const Matrix<T> &_mat2) {
     Matrix<T> mat2t = _mat2.transpose();
     Matrix<T> product(_mat1.getRowSize(), _mat2.getColSize(), 0.0);
 
-    int numCPU = std::thread::hardware_concurrency();
+    int maxNumCPU = std::thread::hardware_concurrency();
+    int numCPU = Matrix<T>::getNumofThread();
+    if (numCPU > maxNumCPU) {
+        cout << "Error: Number of threads cannot exceed " <<maxNumCPU <<".";
+        return Matrix<T>(0,0,0);
+    } else if (numCPU <= 0) {
+        cout << "Error: Invalid number of threads.";
+        return Matrix<T>(0,0,0);
+    }
     
     Logger<T>("Number of threads : " + std::to_string(numCPU));
     std::thread* threads = new std::thread[numCPU];
@@ -292,6 +334,7 @@ void Matrix<T>::enableLogger()
 template <typename T>
 void Matrix<T>::printMatrix()
 {
+    std::cout << "===============================" << std::endl;
     for (int i = 0; i < this->rows; i++)
     {
         for (int j = 0; j < this->cols; j++)
@@ -300,6 +343,6 @@ void Matrix<T>::printMatrix()
         }
         std::cout << std::endl;
     }
-    std::cout << std::endl;
+    std::cout << "===============================" << std::endl;
 }
 #endif
